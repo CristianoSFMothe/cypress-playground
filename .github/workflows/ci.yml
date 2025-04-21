@@ -22,16 +22,16 @@ jobs:
   cypress-run:
     runs-on: ubuntu-22.04
 
+    env:
+      CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+      CYPRESS_PASSWORD: ${{ secrets.PASSWORD }}
+
     steps:
       - name: Copying the Project
         uses: actions/checkout@v4
 
       - name: Install Dependencies
         run: npm ci
-
-      - name: Generate cypress.env.json from secret
-        run: |
-          echo '{ "PASSWORD": "${{ secrets.PASSWORD }}" }' > cypress.env.json
 
       - name: Decide Whether to Run Cypress
         id: should-run
@@ -49,8 +49,6 @@ jobs:
       - name: Run Cypress Tests in Cloud
         if: env.RUN_TESTS == 'true' && env.IS_FORK != 'true'
         run: npm run test:cloud
-        env:
-          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
 
       - name: Upload screenshots on failure
         if: failure() && env.RUN_TESTS == 'true' && env.IS_FORK != 'true'
@@ -78,7 +76,6 @@ jobs:
           echo "**☁️ Cypress Cloud usado:** $([[ '${{ env.IS_FORK }}' == 'false' && '${{ env.RUN_TESTS }}' == 'true' ]] && echo 'Sim' || echo 'Não')" >> $GITHUB_STEP_SUMMARY
           echo "**📅 Evento:** \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**📂 Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
 
           if [[ -d "cypress/screenshots" ]]; then
             echo "### 📸 Screenshots disponíveis como artifact: \`cypress-screenshots\`" >> $GITHUB_STEP_SUMMARY
