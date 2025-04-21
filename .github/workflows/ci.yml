@@ -1,0 +1,92 @@
+name: End-to-end tests
+
+on:
+  push:
+    branches: [main]
+
+  pull_request:
+    branches: [main]
+
+  workflow_dispatch:
+    inputs:
+      run-tests:
+        description: "Run Cypress tests?"
+        required: true
+        default: "true"
+
+  schedule:
+    - cron: "0 7 * * *" # 07:00 UTC (04h Brasil)
+    - cron: "0 19 * * *" # 19:00 UTC (16h Brasil)
+
+jobs:
+  cypress-run:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Copying the Project
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Generate cypress.env.json from secret
+        run: |
+          echo '{ "PASSWORD": "${{ secrets.PASSWORD }}" }' > cypress.env.json
+
+      - name: Decide Whether to Run Cypress
+        id: should-run
+        run: |
+          echo "RUN_TESTS=${{ github.event.inputs.run-tests || 'true' }}" >> $GITHUB_ENV
+
+      - name: Check for Forks (Skip Test if Fork)
+        id: is-fork
+        run: |
+          echo "IS_FORK=false" >> $GITHUB_ENV
+          if [[ "${{ github.event.pull_request.head.repo.fork }}" == "true" ]]; then
+            echo "IS_FORK=true" >> $GITHUB_ENV
+          fi
+
+      - name: Run Cypress Tests in Cloud
+        if: env.RUN_TESTS == 'true' && env.IS_FORK != 'true'
+        run: npm run test:cloud
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+
+      - name: Upload screenshots on failure
+        if: failure() && env.RUN_TESTS == 'true' && env.IS_FORK != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-screenshots
+          path: cypress/screenshots
+          if-no-files-found: ignore
+
+      - name: Upload videos if successful
+        if: success() && env.RUN_TESTS == 'true' && env.IS_FORK != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-videos
+          path: cypress/videos
+          if-no-files-found: ignore
+
+      - name: Generate Job Summary
+        run: |
+          echo "## 🧪 Cypress End-to-End Tests Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "**🔁 Executado manualmente:** ${{ github.event_name == 'workflow_dispatch' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**🌱 Fork externo:** ${{ env.IS_FORK }}" >> $GITHUB_STEP_SUMMARY
+          echo "**☁️ Cypress Cloud usado:** $([[ '${{ env.IS_FORK }}' == 'false' && '${{ env.RUN_TESTS }}' == 'true' ]] && echo 'Sim' || echo 'Não')" >> $GITHUB_STEP_SUMMARY
+          echo "**📅 Evento:** \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**📂 Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [[ -d "cypress/screenshots" ]]; then
+            echo "### 📸 Screenshots disponíveis como artifact: \`cypress-screenshots\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [[ -d "cypress/videos" ]]; then
+            echo "### 🎥 Vídeos disponíveis como artifact: \`cypress-videos\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Esse resumo foi gerado automaticamente._" >> $GITHUB_STEP_SUMMARY
