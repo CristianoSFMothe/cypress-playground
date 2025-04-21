@@ -1,6 +1,8 @@
 describe('Cypress Playground', () => {
 
   beforeEach(() => {
+    const now = new Date(Date.UTC(2025, 4, 21))
+    cy.clock(now)
     cy.visit('https://cypress-playground.s3.eu-central-1.amazonaws.com/index.html')
   });
 
@@ -170,9 +172,8 @@ describe('Cypress Playground', () => {
   });
 
   it('types a password based n a protected variable', () => {
-    cy.log('PASSWORD:', Cypress.env('PASSWORD'))
 
-    cy.get('#password').type(Cypress.env('PASSWORD'))
+    cy.get('#password').type(Cypress.env('PASSWORD'), { log: false })
     cy.get('#show-password-checkbox').check()
 
     cy.get('#password-input input[type="password"]').should('not.exist')
@@ -184,6 +185,42 @@ describe('Cypress Playground', () => {
     cy.get('#password-input input[type="password"]').should('be.visible')
     cy.get('#password-input input[type="text"]')
       .should('not.exist')
+  });
+
+  it('counts the number of animals in a list', () => {
+    cy.get('ul#animals li').should('have.length', 5)
+  });
+
+  it('freezes the browser clock and asserts the frozen date is displayed', () => {
+    cy.contains(
+      'p',
+      'Current date: 2025-05-21'
+    ).should('be.visible')
+  });
+
+  it('copies the code, types it, submit it, the asserts on the success messages', () => {
+    cy.get('#timestamp')
+      .then(element => {
+        const code = element[0].innerText
+
+        cy.get('#code').type(code)
+        cy.contains('button', 'Submit').click()
+
+        cy.contains("Congrats! You've entered the correct code.").should('be.visible')
+      })
+  });
+
+  it('types an incorrect code and asserts on the error message', () => {
+    cy.get('#code').type('1234567890')
+    cy.contains('button', 'Submit').click()
+    cy.contains("The provided code isn't correct. Please, try again.").should('be.visible')
+  });
+
+  it.only('downloads a file, reads it, and asserts on its content', () => {
+    cy.contains('a', 'Download a text file').should('be.visible').click()
+
+    cy.readFile('cypress/downloads/example.txt')
+      .should('be.equal', 'Hello, World!')
   });
 
 })
